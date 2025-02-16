@@ -98,14 +98,11 @@ impl<S: Span> Report<'_, S> {
                     else {
                         continue;
                     };
-                    dbg!(start_line_obj, start_line, start_byte_col);
                     let line_text = src.get_line_text(start_line_obj).unwrap();
-                    dbg!(&line_text);
 
                     let num_chars_before_start = line_text[..start_byte_col.min(line_text.len())]
                         .chars()
                         .count();
-                    dbg!(&num_chars_before_start);
                     let start_char_offset = start_line_obj.offset() + num_chars_before_start;
 
                     if given_label_span.start >= given_label_span.end {
