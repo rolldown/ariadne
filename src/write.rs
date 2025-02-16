@@ -26,7 +26,7 @@ struct LabelInfo<'a> {
     display_info: &'a LabelDisplay,
 }
 
-impl<'a> LabelInfo<'a> {
+impl LabelInfo<'_> {
     fn last_offset(&self) -> usize {
         self.char_span
             .end
@@ -73,7 +73,7 @@ impl<S: Span> Report<'_, S> {
                         .take(col)
                         .map(|ch| ch.len_utf8())
                         .sum();
-                    byte_offset.end = byte_offset.start as usize
+                    byte_offset.end = byte_offset.start
                         + src
                             .chars()
                             .skip(line_obj.offset() + col)
@@ -451,7 +451,7 @@ impl<S: Span> Report<'_, S> {
 
                         if let (Some((margin, _is_start)), true) = (margin_ptr, is_line) {
                             let is_col =
-                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
+                                multi_label.is_some_and(|ml| std::ptr::eq(*ml, margin.label));
                             let is_limit = col + 1 == multi_labels_with_message.len();
                             if !is_col && !is_limit {
                                 hbar = hbar.or(Some(margin.label));
@@ -495,7 +495,7 @@ impl<S: Span> Report<'_, S> {
                             )
                         } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
                             let is_col =
-                                multi_label.map_or(false, |ml| std::ptr::eq(*ml, margin.label));
+                                multi_label.is_some_and(|ml| std::ptr::eq(*ml, margin.label));
                             let is_limit = col == multi_labels_with_message.len();
                             (
                                 if is_limit {
@@ -536,8 +536,7 @@ impl<S: Span> Report<'_, S> {
 
                 let margin_label = multi_labels_with_message
                     .iter()
-                    .enumerate()
-                    .filter_map(|(_i, label)| {
+                    .filter_map(|label| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start {
@@ -564,8 +563,7 @@ impl<S: Span> Report<'_, S> {
                 // Generate a list of labels for this line, along with their label columns
                 let mut line_labels = multi_labels_with_message
                     .iter()
-                    .enumerate()
-                    .filter_map(|(_i, label)| {
+                    .filter_map(|label| {
                         let is_start = line.span().contains(&label.char_span.start);
                         let is_end = line.span().contains(&label.last_offset());
                         if is_start
@@ -1561,7 +1559,7 @@ mod tests {
     fn ascii() {
         let source = "'🤨🤨🤨🤨' + import('missing');";
 
-        let label = Label::new(28..37).with_message(format!("This is of type "));
+        let label = Label::new(28..37).with_message("This is of type ");
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
                 .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))

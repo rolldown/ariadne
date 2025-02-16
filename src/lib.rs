@@ -257,7 +257,7 @@ impl<S: Span> Report<'_, S> {
     }
 }
 
-impl<'a, S: Span> fmt::Debug for Report<'a, S> {
+impl<S: Span> fmt::Debug for Report<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Report")
             .field("kind", &self.kind)
@@ -406,7 +406,7 @@ impl<'a, S: Span> ReportBuilder<'a, S> {
     }
 }
 
-impl<'a, S: Span> fmt::Debug for ReportBuilder<'a, S> {
+impl<S: Span> fmt::Debug for ReportBuilder<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReportBuilder")
             .field("kind", &self.kind)

@@ -5,6 +5,7 @@ pub struct Characters {
     pub hbar: char,
     pub vbar: char,
     pub xbar: char,
+    #[allow(unused)]
     pub vbar_break: char,
     pub vbar_gap: char,
 
@@ -12,6 +13,7 @@ pub struct Characters {
     pub rarrow: char,
 
     pub ltop: char,
+    #[allow(unused)]
     pub mtop: char,
     pub rtop: char,
     pub lbot: char,
@@ -22,6 +24,7 @@ pub struct Characters {
     pub rbox: char,
 
     pub lcross: char,
+    #[allow(unused)]
     pub rcross: char,
 
     pub underbar: char,
@@ -234,7 +237,7 @@ impl ColorGenerator {
     pub fn from_state(state: [u16; 3], min_brightness: f32) -> Self {
         Self {
             state,
-            min_brightness: min_brightness.max(0.0).min(1.0),
+            min_brightness: min_brightness.clamp(0.0, 1.0),
         }
     }
 
