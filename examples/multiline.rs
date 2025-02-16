@@ -1,4 +1,4 @@
-use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
+use rolldown_ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 
 fn main() {
     let mut colors = ColorGenerator::new();
