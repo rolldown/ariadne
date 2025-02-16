@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](https://github.com/zesterer/ariadne)
 ![actions-badge](https://github.com/zesterer/ariadne/workflows/Rust/badge.svg?branch=main)
 
-A fancy compiler diagnostics crate.
+A fork of fancy compiler diagnostics crate [ariadne](https://github.com/zesterer/ariadne).
 
 ## Example
 
