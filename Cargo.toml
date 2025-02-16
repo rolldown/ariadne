@@ -1,12 +1,12 @@
 [package]
-name = "ariadne"
-version = "0.5.0"
+name = "rolldown-ariadne"
+version = "0.5.1"
 description = "A fancy diagnostics & reporting crate"
 authors = ["Joshua Barretto <joshua.s.barretto@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/zesterer/ariadne"
 readme = "README.md"
-edition = "2018"
+edition = "2021"
 keywords = ["error", "diagnostics", "report", "pretty", "compiler"]
 categories = ["command-line-utilities", "compilers", "filesystem", "visualization"]
 exclude = [
