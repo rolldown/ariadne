@@ -1,11 +1,11 @@
 use super::*;
 
+use std::io::Error;
 use std::{
     collections::{hash_map::Entry, HashMap},
     fs,
     path::{Path, PathBuf},
 };
-use std::io::Error;
 
 /// A trait implemented by [`Source`] caches.
 pub trait Cache<Id: ?Sized> {
@@ -60,6 +60,11 @@ impl Line {
     /// Get the offset of this line in the original [`Source`] (i.e: the number of characters that precede it).
     pub fn offset(&self) -> usize {
         self.offset
+    }
+
+    /// Get the byte offset of this line in the original [`Source`].
+    pub fn byte_offset(&self) -> usize {
+        self.byte_offset
     }
 
     /// Get the character length of this line.
@@ -332,9 +337,7 @@ impl Cache<Path> for FileCache {
         Ok::<_, Error>(match self.files.entry(path.to_path_buf()) {
             // TODO: Don't allocate here
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(Source::from(
-                fs::read_to_string(path)?,
-            )),
+            Entry::Vacant(entry) => entry.insert(Source::from(fs::read_to_string(path)?)),
         })
     }
     fn display<'a>(&self, path: &'a Path) -> Option<impl fmt::Display + 'a> {
@@ -403,14 +406,12 @@ where
     I: IntoIterator<Item = (Id, S)>,
     S: AsRef<str>,
 {
-    FnCache::new(
-        (move |id| Err(format!("Failed to fetch source '{}'", id))) as fn(&_) -> _,
-    )
-    .with_sources(
-        iter.into_iter()
-            .map(|(id, s)| (id, Source::from(s)))
-            .collect(),
-    )
+    FnCache::new((move |id| Err(format!("Failed to fetch source '{}'", id))) as fn(&_) -> _)
+        .with_sources(
+            iter.into_iter()
+                .map(|(id, s)| (id, Source::from(s)))
+                .collect(),
+        )
 }
 
 #[cfg(test)]

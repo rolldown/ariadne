@@ -22,6 +22,7 @@ enum LabelKind {
 struct LabelInfo<'a> {
     kind: LabelKind,
     char_span: Range<usize>,
+    byte_span: Range<usize>,
     display_info: &'a LabelDisplay,
 }
 
@@ -54,23 +55,42 @@ impl<S: Span> Report<'_, S> {
                     continue;
                 }
             };
-
             let given_label_span = label.span.start()..label.span.end();
 
-            let (label_char_span, start_line, end_line) = match self.config.index_type {
+            let (label_char_span, label_byte_span, start_line, end_line) = match self
+                .config
+                .index_type
+            {
                 IndexType::Char => {
-                    let Some(start_line) = src.get_offset_line(given_label_span.start) else {
+                    let Some((line_obj, idx, col)) = src.get_offset_line(given_label_span.start)
+                    else {
                         continue;
                     };
+                    let mut byte_offset = 0..0;
+                    byte_offset.start = src
+                        .chars()
+                        .skip(line_obj.offset())
+                        .take(col)
+                        .map(|ch| ch.len_utf8())
+                        .sum();
+                    byte_offset.end = byte_offset.start as usize
+                        + src
+                            .chars()
+                            .skip(line_obj.offset() + col)
+                            .take(given_label_span.end - given_label_span.start)
+                            .map(|ch| ch.len_utf8())
+                            .sum::<usize>();
                     let end_line = if given_label_span.start >= given_label_span.end {
-                        start_line.1
+                        idx
                     } else {
-                        let Some(end_line) = src.get_offset_line(given_label_span.end - 1) else {
+                        let Some((_, end_line_idx, _)) =
+                            src.get_offset_line(given_label_span.end - 1)
+                        else {
                             continue;
                         };
-                        end_line.1
+                        end_line_idx
                     };
-                    (given_label_span, start_line.1, end_line)
+                    (given_label_span, byte_offset, idx, end_line)
                 }
                 IndexType::Byte => {
                     let Some((start_line_obj, start_line, start_byte_col)) =
@@ -78,15 +98,23 @@ impl<S: Span> Report<'_, S> {
                     else {
                         continue;
                     };
+                    dbg!(start_line_obj, start_line, start_byte_col);
                     let line_text = src.get_line_text(start_line_obj).unwrap();
+                    dbg!(&line_text);
 
                     let num_chars_before_start = line_text[..start_byte_col.min(line_text.len())]
                         .chars()
                         .count();
+                    dbg!(&num_chars_before_start);
                     let start_char_offset = start_line_obj.offset() + num_chars_before_start;
 
                     if given_label_span.start >= given_label_span.end {
-                        (start_char_offset..start_char_offset, start_line, start_line)
+                        (
+                            start_char_offset..start_char_offset,
+                            given_label_span,
+                            start_line,
+                            start_line,
+                        )
                     } else {
                         // We can subtract 1 from end, because get_byte_line doesn't actually index into the text.
                         let end_pos = given_label_span.end - 1;
@@ -101,7 +129,12 @@ impl<S: Span> Report<'_, S> {
                             end_line_text[..end_byte_col + 1].chars().count();
                         let end_char_offset = end_line_obj.offset() + num_chars_before_end;
 
-                        (start_char_offset..end_char_offset, start_line, end_line)
+                        (
+                            start_char_offset..end_char_offset,
+                            given_label_span,
+                            start_line,
+                            end_line,
+                        )
                     }
                 }
             };
@@ -114,6 +147,7 @@ impl<S: Span> Report<'_, S> {
                 },
                 char_span: label_char_span,
                 display_info: &label.display_info,
+                byte_span: label_byte_span,
             };
 
             if let Some(group) = groups
@@ -244,7 +278,10 @@ impl<S: Span> Report<'_, S> {
             let location = if src_id == self.span.source() {
                 self.span.start()
             } else {
-                labels[0].char_span.start
+                match self.config.index_type {
+                    IndexType::Char => labels[0].char_span.start,
+                    IndexType::Byte => labels[0].byte_span.start,
+                }
             };
             let line_and_col = match self.config.index_type {
                 IndexType::Char => src.get_offset_line(location),
@@ -1521,5 +1558,29 @@ mod tests {
            |         It has no resemblance.
         ---'
         "###)
+    }
+
+    #[test]
+    fn ascii() {
+        let source = "'🤨🤨🤨🤨' + import('missing');";
+
+        let label = Label::new(28..37).with_message(format!("This is of type "));
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_index_type(IndexType::Byte))
+                .with_message("can't compare apples with oranges")
+                .with_label(label)
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r"
+        Error: can't compare apples with oranges
+           ,-[ <unknown>:1:1 ]
+           |
+         1 | '🤨🤨🤨🤨' + import('missing');
+           |                     ^^^^|^^^^
+           |                         `------ This is of type
+        ---'
+        ")
     }
 }
