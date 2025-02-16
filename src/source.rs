@@ -62,6 +62,11 @@ impl Line {
         self.offset
     }
 
+    /// Get the byte offset of this line in the original [`Source`].
+    pub fn byte_offset(&self) -> usize {
+        self.byte_offset
+    }
+
     /// Get the character length of this line.
     pub fn len(&self) -> usize {
         self.char_len
