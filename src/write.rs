@@ -461,7 +461,7 @@ impl<S: Span> Report<'_, S> {
                         hbar = hbar.filter(|l| {
                             margin_label
                                 .as_ref()
-                                .map_or(true, |margin| !std::ptr::eq(margin.label, *l))
+                                .is_none_or(|margin| !std::ptr::eq(margin.label, *l))
                                 || !is_line
                         });
 
@@ -569,7 +569,7 @@ impl<S: Span> Report<'_, S> {
                         if is_start
                             && margin_label
                                 .as_ref()
-                                .map_or(true, |m| !std::ptr::eq(*label, m.label))
+                                .is_none_or(|m| !std::ptr::eq(*label, m.label))
                         {
                             // TODO: Check to see whether multi is the first on the start line or first on the end line
                             Some(LineLabel {
@@ -660,7 +660,7 @@ impl<S: Span> Report<'_, S> {
                             ll.label.display_info.msg.is_some()
                                 && margin_label
                                     .as_ref()
-                                    .map_or(true, |m| !std::ptr::eq(ll.label, m.label))
+                                    .is_none_or(|m| !std::ptr::eq(ll.label, m.label))
                         })
                         .find(|(j, ll)| ll.col == col && row <= *j)
                         .map(|(_, ll)| ll)
@@ -829,7 +829,7 @@ impl<S: Span> Report<'_, S> {
                             && line_label.label.display_info.msg.is_some()
                             && margin_label
                                 .as_ref()
-                                .map_or(true, |m| !std::ptr::eq(line_label.label, m.label))
+                                .is_none_or(|m| !std::ptr::eq(line_label.label, m.label))
                         {
                             [
                                 if line_label.multi {
@@ -1601,6 +1601,11 @@ mod tests {
          1 | '🤨🤨🤨🤨' + import('missing');
            |                     ^^^^|^^^^
            |                         `------ This is of type
+           |
+           | Help 1: No need to try, they can't be compared.
+           |
+           | Help 2: Yeah, really, please stop.
+           |         It has no resemblance.
         ---'
         ")
     }
