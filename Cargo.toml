@@ -1,6 +1,6 @@
 [package]
 name = "rolldown-ariadne"
-version = "0.5.1"
+version = "0.5.2"
 description = "A fork of github.com/zesterer/ariadne"
 authors = ["Joshua Barretto <joshua.s.barretto@gmail.com>"]
 license = "MIT"
