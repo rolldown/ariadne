@@ -249,7 +249,8 @@ impl<S: Span> Report<'_, S> {
                     .iter()
                     .enumerate()
                 {
-                    let margin = ctx.margin_label
+                    let margin = ctx
+                        .margin_label
                         .as_ref()
                         .filter(|m| std::ptr::eq(*label, m.label));
 
@@ -265,7 +266,8 @@ impl<S: Span> Report<'_, S> {
                         } else if !is_start && (!is_end || ctx.is_line) {
                             vbar = vbar.or(Some(*label).filter(|_| !is_parent));
                         } else if let Some((report_row, is_arrow)) = ctx.report_row {
-                            let label_row = ctx.line_labels
+                            let label_row = ctx
+                                .line_labels
                                 .iter()
                                 .enumerate()
                                 .find(|(_, l)| std::ptr::eq(*label, l.label))
@@ -312,11 +314,16 @@ impl<S: Span> Report<'_, S> {
 
                 let (a, b) = if let Some((label, is_start)) = corner {
                     (
-                        if is_start { ctx.draw.ltop } else { ctx.draw.lbot }
-                            .fg(label.display_info.color, ctx.s),
+                        if is_start {
+                            ctx.draw.ltop
+                        } else {
+                            ctx.draw.lbot
+                        }
+                        .fg(label.display_info.color, ctx.s),
                         ctx.draw.hbar.fg(label.display_info.color, ctx.s),
                     )
-                } else if let Some(label) = hbar.filter(|_| vbar.is_some() && !ctx.config.cross_gap) {
+                } else if let Some(label) = hbar.filter(|_| vbar.is_some() && !ctx.config.cross_gap)
+                {
                     (
                         ctx.draw.xbar.fg(label.display_info.color, ctx.s),
                         ctx.draw.hbar.fg(label.display_info.color, ctx.s),
@@ -368,10 +375,7 @@ impl<S: Span> Report<'_, S> {
         Ok(())
     }
 
-    fn write_simple_margin<W: Write>(
-        w: &mut W,
-        ctx: &SimpleMarginWriteCtx,
-    ) -> std::io::Result<()> {
+    fn write_simple_margin<W: Write>(w: &mut W, ctx: &SimpleMarginWriteCtx) -> std::io::Result<()> {
         let line_no_margin = if ctx.is_line && !ctx.is_ellipsis {
             let line_no = format!("{}", ctx.idx + 1);
             format!(
