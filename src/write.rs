@@ -1075,7 +1075,7 @@ impl<S: Span> Report<'_, S> {
         }
 
         if groups_len == 0 {
-            _ = self.render_help(&mut w, s, line_no_width, &draw);
+            self.render_help(&mut w, s, line_no_width, &draw)?;
         }
 
         Ok(())
