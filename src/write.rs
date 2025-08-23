@@ -992,69 +992,7 @@ impl<S: Span> Report<'_, S> {
 
             // Note
             if is_final_group {
-                for (i, note) in self.notes.iter().enumerate() {
-                    if !self.config.compact {
-                        Self::write_simple_margin(
-                            &mut w,
-                            &SimpleMarginWriteCtx {
-                                idx: 0,
-                                is_line: false,
-                                is_ellipsis: false,
-                                line_no_width,
-                                draw: &draw,
-                                config: &self.config,
-                                s,
-                            },
-                        )?;
-                        writeln!(w)?;
-                    }
-                    let note_prefix = format!("{} {}", "Note", i + 1);
-                    let note_prefix_len = if self.notes.len() > 1 {
-                        note_prefix.len()
-                    } else {
-                        4
-                    };
-                    let mut lines = note.lines();
-                    if let Some(line) = lines.next() {
-                        Self::write_simple_margin(
-                            &mut w,
-                            &SimpleMarginWriteCtx {
-                                idx: 0,
-                                is_line: false,
-                                is_ellipsis: false,
-                                line_no_width,
-                                draw: &draw,
-                                config: &self.config,
-                                s,
-                            },
-                        )?;
-                        if self.notes.len() > 1 {
-                            writeln!(
-                                w,
-                                "{}: {}",
-                                note_prefix.fg(self.config.note_color(), s),
-                                line
-                            )?;
-                        } else {
-                            writeln!(w, "{}: {}", "Note".fg(self.config.note_color(), s), line)?;
-                        }
-                    }
-                    for line in lines {
-                        Self::write_simple_margin(
-                            &mut w,
-                            &SimpleMarginWriteCtx {
-                                idx: 0,
-                                is_line: false,
-                                is_ellipsis: false,
-                                line_no_width,
-                                draw: &draw,
-                                config: &self.config,
-                                s,
-                            },
-                        )?;
-                        writeln!(w, "{:>pad$}{}", "", line, pad = note_prefix_len + 2)?;
-                    }
-                }
+                self.render_notes(&mut w, s, line_no_width, &draw)?;
             }
 
             // Tail of report
@@ -1076,8 +1014,82 @@ impl<S: Span> Report<'_, S> {
 
         if groups_len == 0 {
             self.render_help(&mut w, s, line_no_width, &draw)?;
+            self.render_notes(&mut w, s, line_no_width, &draw)?;
         }
 
+        Ok(())
+    }
+
+    fn render_notes<W: Write>(
+        &self,
+        w: &mut W,
+        s: StreamType,
+        line_no_width: usize,
+        draw: &draw::Characters,
+    ) -> Result<(), io::Error> {
+        for (i, note) in self.notes.iter().enumerate() {
+            if !self.config.compact {
+                Self::write_simple_margin(
+                    w,
+                    &SimpleMarginWriteCtx {
+                        idx: 0,
+                        is_line: false,
+                        is_ellipsis: false,
+                        line_no_width,
+                        draw,
+                        config: &self.config,
+                        s,
+                    },
+                )?;
+                writeln!(w)?;
+            }
+            let note_prefix = format!("{} {}", "Note", i + 1);
+            let note_prefix_len = if self.notes.len() > 1 {
+                note_prefix.len()
+            } else {
+                4
+            };
+            let mut lines = note.lines();
+            if let Some(line) = lines.next() {
+                Self::write_simple_margin(
+                    w,
+                    &SimpleMarginWriteCtx {
+                        idx: 0,
+                        is_line: false,
+                        is_ellipsis: false,
+                        line_no_width,
+                        draw,
+                        config: &self.config,
+                        s,
+                    },
+                )?;
+                if self.notes.len() > 1 {
+                    writeln!(
+                        w,
+                        "{}: {}",
+                        note_prefix.fg(self.config.note_color(), s),
+                        line
+                    )?;
+                } else {
+                    writeln!(w, "{}: {}", "Note".fg(self.config.note_color(), s), line)?;
+                }
+            }
+            for line in lines {
+                Self::write_simple_margin(
+                    w,
+                    &SimpleMarginWriteCtx {
+                        idx: 0,
+                        is_line: false,
+                        is_ellipsis: false,
+                        line_no_width,
+                        draw,
+                        config: &self.config,
+                        s,
+                    },
+                )?;
+                writeln!(w, "{:>pad$}{}", "", line, pad = note_prefix_len + 2)?;
+            }
+        }
         Ok(())
     }
 
@@ -1820,14 +1832,16 @@ mod tests {
     }
 
     #[test]
-    fn zero_label_help_message() {
+    fn zero_label_help_and_note_message() {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
                 .with_config(no_color_and_ascii())
                 .with_message("can't compare apples with oranges")
                 .with_help("No need to try, they can't be compared.")
-                .with_help("Yeah, really, please stop.\nIt has no resemblance.")
+                .with_help("No need to try, they can't be compared2.")
+                .with_note("Yeah, really, please stop.\nIt has no resemblance.")
+                .with_note("Yeah, really, please stop.\nIt has no resemblance2.")
                 .finish()
                 .write_to_string(Source::from(source)),
         );
@@ -1836,8 +1850,13 @@ mod tests {
           |
           | Help 1: No need to try, they can't be compared.
           |
-          | Help 2: Yeah, really, please stop.
+          | Help 2: No need to try, they can't be compared2.
+          |
+          | Note 1: Yeah, really, please stop.
           |         It has no resemblance.
+          |
+          | Note 2: Yeah, really, please stop.
+          |         It has no resemblance2.
         ")
     }
 }
