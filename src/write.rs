@@ -985,7 +985,6 @@ impl<S: Span> Report<'_, S> {
 
             let is_final_group = group_idx + 1 == groups_len;
 
-            dbg!(&is_final_group);
             // Help
             if is_final_group {
                 self.render_help(&mut w, s, line_no_width, &draw)?;
