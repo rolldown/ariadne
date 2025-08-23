@@ -33,6 +33,31 @@ struct LabelInfo<'a> {
     display_info: &'a LabelDisplay,
 }
 
+struct MarginWriteCtx<'a> {
+    idx: usize,
+    is_line: bool,
+    is_ellipsis: bool,
+    draw_labels: bool,
+    report_row: Option<(usize, bool)>,
+    line_labels: &'a [LineLabel<'a>],
+    margin_label: &'a Option<LineLabel<'a>>,
+    line_no_width: usize,
+    draw: &'a draw::Characters,
+    config: &'a Config,
+    s: StreamType,
+    multi_labels_with_message: &'a [&'a LabelInfo<'a>],
+}
+
+struct SimpleMarginWriteCtx<'a> {
+    idx: usize,
+    is_line: bool,
+    is_ellipsis: bool,
+    line_no_width: usize,
+    draw: &'a draw::Characters,
+    config: &'a Config,
+    s: StreamType,
+}
+
 impl LabelInfo<'_> {
     fn last_offset(&self) -> usize {
         self.char_span
@@ -174,68 +199,57 @@ impl<S: Span> Report<'_, S> {
 
     fn write_margin<W: Write, T: AsRef<str>>(
         w: &mut W,
-        idx: usize,
-        is_line: bool,
-        is_ellipsis: bool,
-        draw_labels: bool,
-        report_row: Option<(usize, bool)>,
-        line_labels: &[LineLabel],
-        margin_label: &Option<LineLabel>,
-        line_no_width: usize,
-        draw: &draw::Characters,
-        config: &Config,
-        s: StreamType,
-        multi_labels_with_message: &[&LabelInfo],
+        ctx: &MarginWriteCtx,
         src: &Source<T>,
     ) -> std::io::Result<()> {
-        let line_no_margin = if is_line && !is_ellipsis {
-            let line_no = format!("{}", idx + 1);
+        let line_no_margin = if ctx.is_line && !ctx.is_ellipsis {
+            let line_no = format!("{}", ctx.idx + 1);
             format!(
                 "{}{} {}",
-                Show((' ', line_no_width - line_no.chars().count())),
+                Show((' ', ctx.line_no_width - line_no.chars().count())),
                 line_no,
-                draw.vbar,
+                ctx.draw.vbar,
             )
-            .fg(config.margin_color(), s)
+            .fg(ctx.config.margin_color(), ctx.s)
         } else {
             format!(
                 "{}{}",
-                Show((' ', line_no_width + 1)),
-                if is_ellipsis {
-                    draw.vbar_gap
+                Show((' ', ctx.line_no_width + 1)),
+                if ctx.is_ellipsis {
+                    ctx.draw.vbar_gap
                 } else {
-                    draw.vbar
+                    ctx.draw.vbar
                 }
             )
-            .fg(config.skipped_margin_color(), s)
+            .fg(ctx.config.skipped_margin_color(), ctx.s)
         };
 
         write!(
             w,
             " {}{}",
             line_no_margin,
-            Show(Some(' ').filter(|_| !config.compact)),
+            Show(Some(' ').filter(|_| !ctx.config.compact)),
         )?;
 
         // Multi-line margins
-        if draw_labels {
-            for col in 0..multi_labels_with_message.len()
-                + (!multi_labels_with_message.is_empty()) as usize
+        if ctx.draw_labels {
+            for col in 0..ctx.multi_labels_with_message.len()
+                + (!ctx.multi_labels_with_message.is_empty()) as usize
             {
                 let mut corner = None;
                 let mut hbar: Option<&LabelInfo> = None;
                 let mut vbar: Option<&LabelInfo> = None;
                 let mut margin_ptr = None;
 
-                let multi_label = multi_labels_with_message.get(col);
-                let line_span = src.line(idx).unwrap().span();
+                let multi_label = ctx.multi_labels_with_message.get(col);
+                let line_span = src.line(ctx.idx).unwrap().span();
 
-                for (i, label) in multi_labels_with_message
-                    [0..(col + 1).min(multi_labels_with_message.len())]
+                for (i, label) in ctx.multi_labels_with_message
+                    [0..(col + 1).min(ctx.multi_labels_with_message.len())]
                     .iter()
                     .enumerate()
                 {
-                    let margin = margin_label
+                    let margin = ctx.margin_label
                         .as_ref()
                         .filter(|m| std::ptr::eq(*label, m.label));
 
@@ -246,12 +260,12 @@ impl<S: Span> Report<'_, S> {
                         let is_start = line_span.contains(&label.char_span.start);
                         let is_end = line_span.contains(&label.last_offset());
 
-                        if let Some(margin) = margin.filter(|_| is_line) {
+                        if let Some(margin) = margin.filter(|_| ctx.is_line) {
                             margin_ptr = Some((margin, is_start));
-                        } else if !is_start && (!is_end || is_line) {
+                        } else if !is_start && (!is_end || ctx.is_line) {
                             vbar = vbar.or(Some(*label).filter(|_| !is_parent));
-                        } else if let Some((report_row, is_arrow)) = report_row {
-                            let label_row = line_labels
+                        } else if let Some((report_row, is_arrow)) = ctx.report_row {
+                            let label_row = ctx.line_labels
                                 .iter()
                                 .enumerate()
                                 .find(|(_, l)| std::ptr::eq(*label, l.label))
@@ -281,71 +295,71 @@ impl<S: Span> Report<'_, S> {
                     }
                 }
 
-                if let (Some((margin, _is_start)), true) = (margin_ptr, is_line) {
+                if let (Some((margin, _is_start)), true) = (margin_ptr, ctx.is_line) {
                     let is_col = multi_label.is_some_and(|ml| std::ptr::eq(*ml, margin.label));
-                    let is_limit = col + 1 == multi_labels_with_message.len();
+                    let is_limit = col + 1 == ctx.multi_labels_with_message.len();
                     if !is_col && !is_limit {
                         hbar = hbar.or(Some(margin.label));
                     }
                 }
 
                 hbar = hbar.filter(|l| {
-                    margin_label
+                    ctx.margin_label
                         .as_ref()
                         .is_none_or(|margin| !std::ptr::eq(margin.label, *l))
-                        || !is_line
+                        || !ctx.is_line
                 });
 
                 let (a, b) = if let Some((label, is_start)) = corner {
                     (
-                        if is_start { draw.ltop } else { draw.lbot }
-                            .fg(label.display_info.color, s),
-                        draw.hbar.fg(label.display_info.color, s),
+                        if is_start { ctx.draw.ltop } else { ctx.draw.lbot }
+                            .fg(label.display_info.color, ctx.s),
+                        ctx.draw.hbar.fg(label.display_info.color, ctx.s),
                     )
-                } else if let Some(label) = hbar.filter(|_| vbar.is_some() && !config.cross_gap) {
+                } else if let Some(label) = hbar.filter(|_| vbar.is_some() && !ctx.config.cross_gap) {
                     (
-                        draw.xbar.fg(label.display_info.color, s),
-                        draw.hbar.fg(label.display_info.color, s),
+                        ctx.draw.xbar.fg(label.display_info.color, ctx.s),
+                        ctx.draw.hbar.fg(label.display_info.color, ctx.s),
                     )
                 } else if let Some(label) = hbar {
                     (
-                        draw.hbar.fg(label.display_info.color, s),
-                        draw.hbar.fg(label.display_info.color, s),
+                        ctx.draw.hbar.fg(label.display_info.color, ctx.s),
+                        ctx.draw.hbar.fg(label.display_info.color, ctx.s),
                     )
                 } else if let Some(label) = vbar {
                     (
-                        if is_ellipsis {
-                            draw.vbar_gap
+                        if ctx.is_ellipsis {
+                            ctx.draw.vbar_gap
                         } else {
-                            draw.vbar
+                            ctx.draw.vbar
                         }
-                        .fg(label.display_info.color, s),
-                        ' '.fg(None, s),
+                        .fg(label.display_info.color, ctx.s),
+                        ' '.fg(None, ctx.s),
                     )
-                } else if let (Some((margin, is_start)), true) = (margin_ptr, is_line) {
+                } else if let (Some((margin, is_start)), true) = (margin_ptr, ctx.is_line) {
                     let is_col = multi_label.is_some_and(|ml| std::ptr::eq(*ml, margin.label));
-                    let is_limit = col == multi_labels_with_message.len();
+                    let is_limit = col == ctx.multi_labels_with_message.len();
                     (
                         if is_limit {
-                            draw.rarrow
+                            ctx.draw.rarrow
                         } else if is_col {
                             if is_start {
-                                draw.ltop
+                                ctx.draw.ltop
                             } else {
-                                draw.lcross
+                                ctx.draw.lcross
                             }
                         } else {
-                            draw.hbar
+                            ctx.draw.hbar
                         }
-                        .fg(margin.label.display_info.color, s),
-                        if !is_limit { draw.hbar } else { ' ' }
-                            .fg(margin.label.display_info.color, s),
+                        .fg(margin.label.display_info.color, ctx.s),
+                        if !is_limit { ctx.draw.hbar } else { ' ' }
+                            .fg(margin.label.display_info.color, ctx.s),
                     )
                 } else {
-                    (' '.fg(None, s), ' '.fg(None, s))
+                    (' '.fg(None, ctx.s), ' '.fg(None, ctx.s))
                 };
                 write!(w, "{}", a)?;
-                if !config.compact {
+                if !ctx.config.compact {
                     write!(w, "{}", b)?;
                 }
             }
@@ -356,45 +370,35 @@ impl<S: Span> Report<'_, S> {
 
     fn write_simple_margin<W: Write>(
         w: &mut W,
-        idx: usize,
-        is_line: bool,
-        is_ellipsis: bool,
-        _draw_labels: bool,
-        _report_row: Option<(usize, bool)>,
-        _line_labels: &[LineLabel],
-        _margin_label: &Option<LineLabel>,
-        line_no_width: usize,
-        draw: &draw::Characters,
-        config: &Config,
-        s: StreamType,
+        ctx: &SimpleMarginWriteCtx,
     ) -> std::io::Result<()> {
-        let line_no_margin = if is_line && !is_ellipsis {
-            let line_no = format!("{}", idx + 1);
+        let line_no_margin = if ctx.is_line && !ctx.is_ellipsis {
+            let line_no = format!("{}", ctx.idx + 1);
             format!(
                 "{}{} {}",
-                Show((' ', line_no_width - line_no.chars().count())),
+                Show((' ', ctx.line_no_width - line_no.chars().count())),
                 line_no,
-                draw.vbar,
+                ctx.draw.vbar,
             )
-            .fg(config.margin_color(), s)
+            .fg(ctx.config.margin_color(), ctx.s)
         } else {
             format!(
                 "{}{}",
-                Show((' ', line_no_width + 1)),
-                if is_ellipsis {
-                    draw.vbar_gap
+                Show((' ', ctx.line_no_width + 1)),
+                if ctx.is_ellipsis {
+                    ctx.draw.vbar_gap
                 } else {
-                    draw.vbar
+                    ctx.draw.vbar
                 }
             )
-            .fg(config.skipped_margin_color(), s)
+            .fg(ctx.config.skipped_margin_color(), ctx.s)
         };
 
         write!(
             w,
             " {}{}",
             line_no_margin,
-            Show(Some(' ').filter(|_| !config.compact)),
+            Show(Some(' ').filter(|_| !ctx.config.compact)),
         )?;
 
         Ok(())
@@ -672,18 +676,20 @@ impl<S: Span> Report<'_, S> {
                         if !self.config.compact && !is_ellipsis {
                             Self::write_margin(
                                 &mut w,
-                                idx,
-                                false,
-                                is_ellipsis,
-                                false,
-                                None,
-                                &[],
-                                &None,
-                                line_no_width,
-                                &draw,
-                                &self.config,
-                                s,
-                                &multi_labels_with_message,
+                                &MarginWriteCtx {
+                                    idx,
+                                    is_line: false,
+                                    is_ellipsis,
+                                    draw_labels: false,
+                                    report_row: None,
+                                    line_labels: &[],
+                                    margin_label: &None,
+                                    line_no_width,
+                                    draw: &draw,
+                                    config: &self.config,
+                                    s,
+                                    multi_labels_with_message: &multi_labels_with_message,
+                                },
                                 src,
                             )?;
                             writeln!(w)?;
@@ -767,18 +773,20 @@ impl<S: Span> Report<'_, S> {
                 // Margin
                 Self::write_margin(
                     &mut w,
-                    idx,
-                    true,
-                    is_ellipsis,
-                    true,
-                    None,
-                    &line_labels,
-                    &margin_label,
-                    line_no_width,
-                    &draw,
-                    &self.config,
-                    s,
-                    &multi_labels_with_message,
+                    &MarginWriteCtx {
+                        idx,
+                        is_line: true,
+                        is_ellipsis,
+                        draw_labels: true,
+                        report_row: None,
+                        line_labels: &line_labels,
+                        margin_label: &margin_label,
+                        line_no_width,
+                        draw: &draw,
+                        config: &self.config,
+                        s,
+                        multi_labels_with_message: &multi_labels_with_message,
+                    },
                     src,
                 )?;
 
@@ -819,18 +827,20 @@ impl<S: Span> Report<'_, S> {
                         // Margin alternate
                         Self::write_margin(
                             &mut w,
-                            idx,
-                            false,
-                            is_ellipsis,
-                            true,
-                            Some((row, false)),
-                            &line_labels,
-                            &margin_label,
-                            line_no_width,
-                            &draw,
-                            &self.config,
-                            s,
-                            &multi_labels_with_message,
+                            &MarginWriteCtx {
+                                idx,
+                                is_line: false,
+                                is_ellipsis,
+                                draw_labels: true,
+                                report_row: Some((row, false)),
+                                line_labels: &line_labels,
+                                margin_label: &margin_label,
+                                line_no_width,
+                                draw: &draw,
+                                config: &self.config,
+                                s,
+                                multi_labels_with_message: &multi_labels_with_message,
+                            },
                             src,
                         )?;
                         // Lines alternate
@@ -883,18 +893,20 @@ impl<S: Span> Report<'_, S> {
                     // Margin
                     Self::write_margin(
                         &mut w,
-                        idx,
-                        false,
-                        is_ellipsis,
-                        true,
-                        Some((row, true)),
-                        &line_labels,
-                        &margin_label,
-                        line_no_width,
-                        &draw,
-                        &self.config,
-                        s,
-                        &multi_labels_with_message,
+                        &MarginWriteCtx {
+                            idx,
+                            is_line: false,
+                            is_ellipsis,
+                            draw_labels: true,
+                            report_row: Some((row, true)),
+                            line_labels: &line_labels,
+                            margin_label: &margin_label,
+                            line_no_width,
+                            draw: &draw,
+                            config: &self.config,
+                            s,
+                            multi_labels_with_message: &multi_labels_with_message,
+                        },
                         src,
                     )?;
                     // Lines
@@ -981,17 +993,15 @@ impl<S: Span> Report<'_, S> {
                     if !self.config.compact {
                         Self::write_simple_margin(
                             &mut w,
-                            0,
-                            false,
-                            false,
-                            true,
-                            Some((0, false)),
-                            &[],
-                            &None,
-                            line_no_width,
-                            &draw,
-                            &self.config,
-                            s,
+                            &SimpleMarginWriteCtx {
+                                idx: 0,
+                                is_line: false,
+                                is_ellipsis: false,
+                                line_no_width,
+                                draw: &draw,
+                                config: &self.config,
+                                s,
+                            },
                         )?;
                         writeln!(w)?;
                     }
@@ -1005,17 +1015,15 @@ impl<S: Span> Report<'_, S> {
                     if let Some(line) = lines.next() {
                         Self::write_simple_margin(
                             &mut w,
-                            0,
-                            false,
-                            false,
-                            true,
-                            Some((0, false)),
-                            &[],
-                            &None,
-                            line_no_width,
-                            &draw,
-                            &self.config,
-                            s,
+                            &SimpleMarginWriteCtx {
+                                idx: 0,
+                                is_line: false,
+                                is_ellipsis: false,
+                                line_no_width,
+                                draw: &draw,
+                                config: &self.config,
+                                s,
+                            },
                         )?;
                         if self.notes.len() > 1 {
                             writeln!(
@@ -1031,17 +1039,15 @@ impl<S: Span> Report<'_, S> {
                     for line in lines {
                         Self::write_simple_margin(
                             &mut w,
-                            0,
-                            false,
-                            false,
-                            true,
-                            Some((0, false)),
-                            &[],
-                            &None,
-                            line_no_width,
-                            &draw,
-                            &self.config,
-                            s,
+                            &SimpleMarginWriteCtx {
+                                idx: 0,
+                                is_line: false,
+                                is_ellipsis: false,
+                                line_no_width,
+                                draw: &draw,
+                                config: &self.config,
+                                s,
+                            },
                         )?;
                         writeln!(w, "{:>pad$}{}", "", line, pad = note_prefix_len + 2)?;
                     }
@@ -1083,17 +1089,15 @@ impl<S: Span> Report<'_, S> {
             if !self.config.compact {
                 Self::write_simple_margin(
                     w,
-                    0,
-                    false,
-                    false,
-                    true,
-                    Some((0, false)),
-                    &[],
-                    &None,
-                    line_no_width,
-                    draw,
-                    &self.config,
-                    s,
+                    &SimpleMarginWriteCtx {
+                        idx: 0,
+                        is_line: false,
+                        is_ellipsis: false,
+                        line_no_width,
+                        draw,
+                        config: &self.config,
+                        s,
+                    },
                 )?;
                 writeln!(w)?;
             }
@@ -1107,17 +1111,15 @@ impl<S: Span> Report<'_, S> {
             if let Some(line) = lines.next() {
                 Self::write_simple_margin(
                     w,
-                    0,
-                    false,
-                    false,
-                    true,
-                    Some((0, false)),
-                    &[],
-                    &None,
-                    line_no_width,
-                    draw,
-                    &self.config,
-                    s,
+                    &SimpleMarginWriteCtx {
+                        idx: 0,
+                        is_line: false,
+                        is_ellipsis: false,
+                        line_no_width,
+                        draw,
+                        config: &self.config,
+                        s,
+                    },
                 )?;
                 if self.help.len() > 1 {
                     writeln!(
@@ -1133,17 +1135,15 @@ impl<S: Span> Report<'_, S> {
             for line in lines {
                 Self::write_simple_margin(
                     w,
-                    0,
-                    false,
-                    false,
-                    true,
-                    Some((0, false)),
-                    &[],
-                    &None,
-                    line_no_width,
-                    draw,
-                    &self.config,
-                    s,
+                    &SimpleMarginWriteCtx {
+                        idx: 0,
+                        is_line: false,
+                        is_ellipsis: false,
+                        line_no_width,
+                        draw,
+                        config: &self.config,
+                        s,
+                    },
                 )?;
                 writeln!(w, "{:>pad$}{}", "", line, pad = help_prefix_len + 2)?;
             }
