@@ -428,7 +428,7 @@ mod tests {
         assert_eq!(source.lines.len(), lines.len());
 
         let mut offset = 0;
-        for (source_line, raw_line) in zip(source.lines.iter().copied(), lines.into_iter()) {
+        for (source_line, raw_line) in zip(source.lines.iter().copied(), lines) {
             assert_eq!(source_line.offset, offset);
             assert_eq!(source_line.char_len, raw_line.chars().count());
             assert_eq!(source.get_line_text(source_line).unwrap(), raw_line);
