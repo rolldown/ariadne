@@ -450,7 +450,7 @@ impl<S: Span> Report<'_, S> {
             ReportKind::Advice => self.config.advice_color(),
             ReportKind::Custom(_, color) => Some(color),
         };
-        if self.config.kind_prefix {
+        if self.config.severity_prefix {
             let id = format!("{}{}:", Show(code), self.kind);
             writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
         } else if let Some(id) = code {
@@ -1867,10 +1867,10 @@ mod tests {
     }
 
     #[test]
-    fn no_kind_prefix() {
+    fn no_severity_prefix() {
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_kind_prefix(false))
+                .with_config(no_color_and_ascii().with_severity_prefix(false))
                 .with_message("can't compare apples with oranges")
                 .finish()
                 .write_to_string(Source::from("")),
@@ -1881,10 +1881,10 @@ mod tests {
     }
 
     #[test]
-    fn no_kind_prefix_with_code() {
+    fn no_severity_prefix_with_code() {
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_kind_prefix(false))
+                .with_config(no_color_and_ascii().with_severity_prefix(false))
                 .with_code("E001")
                 .with_message("can't compare apples with oranges")
                 .finish()
@@ -1896,11 +1896,11 @@ mod tests {
     }
 
     #[test]
-    fn no_kind_prefix_with_labels() {
+    fn no_severity_prefix_with_labels() {
         let source = "apple == orange;";
         let msg = remove_trailing(
             Report::build(ReportKind::Error, 0..0)
-                .with_config(no_color_and_ascii().with_kind_prefix(false))
+                .with_config(no_color_and_ascii().with_severity_prefix(false))
                 .with_message("can't compare apples with oranges")
                 .with_label(Label::new(0..5).with_message("This is an apple"))
                 .with_label(Label::new(9..15).with_message("This is an orange"))
