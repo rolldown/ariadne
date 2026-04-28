@@ -444,14 +444,20 @@ impl<S: Span> Report<'_, S> {
         // --- Header ---
 
         let code = self.code.as_ref().map(|c| format!("[{}] ", c));
-        let id = format!("{}{}:", Show(code), self.kind);
         let kind_color = match self.kind {
             ReportKind::Error => self.config.error_color(),
             ReportKind::Warning => self.config.warning_color(),
             ReportKind::Advice => self.config.advice_color(),
             ReportKind::Custom(_, color) => Some(color),
         };
-        writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
+        if self.config.severity_prefix {
+            let id = format!("{}{}:", Show(code), self.kind);
+            writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
+        } else if let Some(id) = code {
+            writeln!(w, "{}{}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
+        } else {
+            writeln!(w, "{}", Show(self.msg.as_ref()))?;
+        }
 
         let groups = self.get_source_groups(&mut cache);
 
@@ -1858,5 +1864,59 @@ mod tests {
           | Note 2: Yeah, really, please stop.
           |         It has no resemblance2.
         ")
+    }
+
+    #[test]
+    fn no_severity_prefix() {
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_severity_prefix(false))
+                .with_message("can't compare apples with oranges")
+                .finish()
+                .write_to_string(Source::from("")),
+        );
+        assert_snapshot!(msg, @r###"
+        can't compare apples with oranges
+        "###)
+    }
+
+    #[test]
+    fn no_severity_prefix_with_code() {
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_severity_prefix(false))
+                .with_code("E001")
+                .with_message("can't compare apples with oranges")
+                .finish()
+                .write_to_string(Source::from("")),
+        );
+        assert_snapshot!(msg, @r###"
+        [E001] can't compare apples with oranges
+        "###)
+    }
+
+    #[test]
+    fn no_severity_prefix_with_labels() {
+        let source = "apple == orange;";
+        let msg = remove_trailing(
+            Report::build(ReportKind::Error, 0..0)
+                .with_config(no_color_and_ascii().with_severity_prefix(false))
+                .with_message("can't compare apples with oranges")
+                .with_label(Label::new(0..5).with_message("This is an apple"))
+                .with_label(Label::new(9..15).with_message("This is an orange"))
+                .finish()
+                .write_to_string(Source::from(source)),
+        );
+        assert_snapshot!(msg, @r###"
+        can't compare apples with oranges
+           ,-[ <unknown>:1:1 ]
+           |
+         1 | apple == orange;
+           | ^^|^^    ^^^|^^
+           |   `-------------- This is an apple
+           |             |
+           |             `---- This is an orange
+        ---'
+        "###)
     }
 }
