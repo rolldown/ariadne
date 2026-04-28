@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+# [0.6.0] - 2026-04-29
+
+### Added
+
+- Render help/note messages even when a report has no labels (#10)
+
+### Changed
+
+- Refactored notes rendering (#11)
+
 # [0.5.1] - 2025-03-13
 
 ### Added
