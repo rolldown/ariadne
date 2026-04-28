@@ -453,8 +453,7 @@ impl<S: Span> Report<'_, S> {
         if self.config.kind_prefix {
             let id = format!("{}{}:", Show(code), self.kind);
             writeln!(w, "{} {}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
-        } else if code.is_some() {
-            let id = format!("{}", Show(code));
+        } else if let Some(id) = code {
             writeln!(w, "{}{}", id.fg(kind_color, s), Show(self.msg.as_ref()))?;
         } else {
             writeln!(w, "{}", Show(self.msg.as_ref()))?;
