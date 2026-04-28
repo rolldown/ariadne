@@ -472,6 +472,7 @@ pub struct Config {
     tab_width: usize,
     char_set: CharSet,
     index_type: IndexType,
+    kind_prefix: bool,
 }
 
 impl Config {
@@ -540,6 +541,13 @@ impl Config {
         self.index_type = index_type;
         self
     }
+    /// Should the report kind prefix (e.g. `Error:`, `Warning:`) be shown in the header?
+    ///
+    /// If unspecified, this defaults to [`true`].
+    pub const fn with_kind_prefix(mut self, kind_prefix: bool) -> Self {
+        self.kind_prefix = kind_prefix;
+        self
+    }
 
     fn error_color(&self) -> Option<Color> {
         Some(Color::Red).filter(|_| self.color)
@@ -591,6 +599,7 @@ impl Config {
             tab_width: 4,
             char_set: CharSet::Unicode,
             index_type: IndexType::Char,
+            kind_prefix: true,
         }
     }
 }
