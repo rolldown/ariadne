@@ -550,25 +550,25 @@ impl Config {
     }
 
     fn error_color(&self) -> Option<Color> {
-        Some(Color::Red).filter(|_| self.color)
+        self.color.then_some(Color::Red)
     }
     fn warning_color(&self) -> Option<Color> {
-        Some(Color::Yellow).filter(|_| self.color)
+        self.color.then_some(Color::Yellow)
     }
     fn advice_color(&self) -> Option<Color> {
-        Some(Color::Fixed(147)).filter(|_| self.color)
+        self.color.then_some(Color::Fixed(147))
     }
     fn margin_color(&self) -> Option<Color> {
-        Some(Color::Fixed(246)).filter(|_| self.color)
+        self.color.then_some(Color::Fixed(246))
     }
     fn skipped_margin_color(&self) -> Option<Color> {
-        Some(Color::Fixed(240)).filter(|_| self.color)
+        self.color.then_some(Color::Fixed(240))
     }
     fn unimportant_color(&self) -> Option<Color> {
-        Some(Color::Fixed(249)).filter(|_| self.color)
+        self.color.then_some(Color::Fixed(249))
     }
     fn note_color(&self) -> Option<Color> {
-        Some(Color::Fixed(115)).filter(|_| self.color)
+        self.color.then_some(Color::Fixed(115))
     }
     fn filter_color(&self, color: Option<Color>) -> Option<Color> {
         color.filter(|_| self.color)
